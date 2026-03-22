@@ -562,7 +562,7 @@ function App() {
               <h3 className="text-sm font-medium text-slate-700">新しいプロジェクト</h3>
               <div className="grid gap-3 sm:grid-cols-[1fr,1fr,auto] sm:items-end">
                 <div>
-                  <label className="block text-xs font-medium text-slate-500 mb-1">名前（例：簿記2級）</label>
+                  <label className="block text-xs font-medium text-slate-500 mb-1">名前（例：期末テスト）</label>
                   <input
                     type="text"
                     value={newProjectName}
@@ -599,7 +599,7 @@ function App() {
                     type="submit"
                     className="rounded-xl bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800"
                   >
-                    追加
+                    設定
                   </button>
                   <button
                     type="button"
@@ -735,7 +735,7 @@ function App() {
             </div>
           ) : (
             <p className="text-slate-500 text-sm">
-              上の「+」でプロジェクトを追加し、試験日と総問題数を設定するとカウントダウンが表示されます。
+              上の「+」でプロジェクトを設定するとカウントダウンが表示されます。
             </p>
           )}
         </div>
@@ -789,12 +789,14 @@ function App() {
               </p>
             </div>
 
-            <div className="text-right w-24 h-14 flex flex-col justify-center shrink-0">
-              <p className="text-xs text-slate-500">新規パート達成度</p>
-              <p className="text-xl font-semibold text-slate-900">
-                {newScore.toFixed(0)}%
-              </p>
-            </div>
+            {activeProject && (
+              <div className="text-right w-24 h-14 flex flex-col justify-center shrink-0">
+                <p className="text-xs text-slate-500">新規パート達成度</p>
+                <p className="text-xl font-semibold text-slate-900">
+                  {newScore.toFixed(0)}%
+                </p>
+              </div>
+            )}
           </div>
 
           {activeProject && requiredNewToday !== null ? (
@@ -863,12 +865,14 @@ function App() {
               </p>
             </div>
 
-            <div className="text-right w-24 h-14 flex flex-col justify-center shrink-0">
-              <p className="text-xs text-slate-500">復習パート達成度</p>
-              <p className="text-xl font-semibold text-slate-900">
-                {reviewScore.toFixed(0)}%
-              </p>
-            </div>
+            {activeProject && (
+              <div className="text-right w-24 h-14 flex flex-col justify-center shrink-0">
+                <p className="text-xs text-slate-500">復習パート達成度</p>
+                <p className="text-xl font-semibold text-slate-900">
+                  {reviewScore.toFixed(0)}%
+                </p>
+              </div>
+            )}
           </div>
 
           <div className="space-y-2">
