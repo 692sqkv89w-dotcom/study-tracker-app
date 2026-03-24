@@ -319,12 +319,7 @@ function App() {
 
   const handleDeleteProject = (e: React.MouseEvent, projectId: string) => {
     e.stopPropagation();
-    if (projects.length <= 1) return;
-    setProjects((prev) => {
-      const next = prev.filter((p) => p.id !== projectId);
-      if (next.length === 0) return prev;
-      return next;
-    });
+    setProjects((prev) => prev.filter((p) => p.id !== projectId));
     if (activeProjectId === projectId) {
       const remaining = projects.filter((p) => p.id !== projectId);
       setActiveProjectId(remaining[0]?.id ?? null);
@@ -528,21 +523,19 @@ function App() {
                 >
                   {p.name}
                 </button>
-                {projects.length > 1 && (
-                  <button
-                    type="button"
-                    onClick={(e) => handleDeleteProject(e, p.id)}
-                    className={`flex items-center justify-center min-w-[2rem] py-2 px-2.5 rounded-r-xl text-slate-400 hover:text-white hover:bg-red-500 transition-colors ${
-                      activeProjectId === p.id ? "bg-slate-800 hover:bg-red-500" : "bg-slate-100 hover:bg-red-500"
-                    }`}
-                    title="プロジェクトを削除"
-                    aria-label={`${p.name}を削除`}
-                  >
-                    <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                  </button>
-                )}
+                <button
+                  type="button"
+                  onClick={(e) => handleDeleteProject(e, p.id)}
+                  className={`flex items-center justify-center min-w-[2rem] py-2 px-2.5 rounded-r-xl text-slate-400 hover:text-white hover:bg-red-500 transition-colors ${
+                    activeProjectId === p.id ? "bg-slate-800 hover:bg-red-500" : "bg-slate-100 hover:bg-red-500"
+                  }`}
+                  title="プロジェクトを削除"
+                  aria-label={`${p.name}を削除`}
+                >
+                  <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
               </div>
             ))}
             <button
