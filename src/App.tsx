@@ -65,6 +65,7 @@ function App() {
     [projects, activeProjectId]
   );
 
+  const [projectNameInput, setProjectNameInput] = useState("");
   const [examDateInput, setExamDateInput] = useState("");
   const [totalProblemsInput, setTotalProblemsInput] = useState("");
 
@@ -143,6 +144,7 @@ function App() {
 
   useEffect(() => {
     if (activeProject) {
+      setProjectNameInput(activeProject.name);
       setExamDateInput(activeProject.examDate);
       setTotalProblemsInput(String(activeProject.totalProblems));
     }
@@ -273,7 +275,8 @@ function App() {
 
   const handleSaveSettings = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!examDateInput || !totalProblemsInput || !activeProjectId) return;
+    const name = projectNameInput.trim();
+    if (!name || !examDateInput || !totalProblemsInput || !activeProjectId) return;
 
     const total = Number(totalProblemsInput);
     if (Number.isNaN(total) || total <= 0) return;
@@ -281,7 +284,7 @@ function App() {
     setProjects((prev) =>
       prev.map((p) =>
         p.id === activeProjectId
-          ? { ...p, examDate: examDateInput, totalProblems: total }
+          ? { ...p, name, examDate: examDateInput, totalProblems: total }
           : p
       )
     );
@@ -638,6 +641,19 @@ function App() {
                 </p>
               ) : (
               <form onSubmit={handleSaveSettings} className="space-y-4">
+                <div className="space-y-1">
+                  <label className="block text-sm font-medium text-slate-700">
+                    プロジェクト名
+                  </label>
+                  <input
+                    type="text"
+                    className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-sky-400 focus:ring-2 focus:ring-sky-200 outline-none bg-white"
+                    value={projectNameInput}
+                    onChange={(e) => setProjectNameInput(e.target.value)}
+                    placeholder="例：簿記2級"
+                    required
+                  />
+                </div>
                 <div className="space-y-1">
                   <label className="block text-sm font-medium text-slate-700">
                     試験日
