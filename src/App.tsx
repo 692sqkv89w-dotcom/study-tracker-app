@@ -20,6 +20,29 @@ type StudySession = {
   content?: string;
 };
 
+/** 端末のローカル日付（0時切り替え）を YYYY-MM-DD に。toISOString は UTC のため日本などで日付がずれる */
+function formatLocalYyyyMmDd(d: Date): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
+function addDaysToYyyyMmDd(dateStr: string, days: number): string {
+  const [y, m, d] = dateStr.split("-").map(Number);
+  const dt = new Date(y, m - 1, d + days);
+  return formatLocalYyyyMmDd(dt);
+}
+
+/** 試験日など YYYY-MM-DD をローカル暦の 0 時として解釈 */
+function parseYyyyMmDdLocal(s: string): Date {
+  const [y, m, d] = s.split("-").map(Number);
+  return new Date(y, m - 1, d);
+}
+
+const dateInputClass =
+  "w-full min-w-0 min-h-[2.75rem] box-border rounded-xl border border-slate-200 px-3 py-2 text-base text-slate-900 shadow-sm focus:border-sky-400 focus:ring-2 focus:ring-sky-200 outline-none bg-white [color-scheme:light]";
+
 function usePersistentState<T>(
   key: string,
   defaultValue: T
@@ -89,6 +112,12 @@ function App() {
 
   const [showSettingsPanel, setShowSettingsPanel] = useState(false);
   const [activeTab, setActiveTab] = useState<0 | 1 | 2>(0);
+  /** 日付が変わったあとも「今日」を更新する（開きっぱなし対策） */
+  const [, setClockTick] = useState(0);
+  useEffect(() => {
+    const id = window.setInterval(() => setClockTick((n) => n + 1), 60_000);
+    return () => clearInterval(id);
+  }, []);
   const [showAddProject, setShowAddProject] = useState(false);
   const [newProjectName, setNewProjectName] = useState("");
   const [newProjectExamDate, setNewProjectExamDate] = useState("");
@@ -191,15 +220,20 @@ function App() {
     [studySessions, activeProjectId]
   );
 
-  const realToday = new Date();
-  const realTodayStr = realToday.toISOString().slice(0, 10); // YYYY-MM-DD
+  const now = new Date();
+  const realTodayStr = formatLocalYyyyMmDd(now);
   const todayStr = realTodayStr;
 
   let daysLeft: number | null = null;
 
   if (activeProject) {
-    const exam = new Date(activeProject.examDate);
-    const diffMs = exam.getTime() - realToday.setHours(0, 0, 0, 0);
+    const examDay = parseYyyyMmDdLocal(activeProject.examDate);
+    const startOfToday = new Date(
+      now.getFullYear(),
+      now.getMonth(),
+      now.getDate()
+    );
+    const diffMs = examDay.getTime() - startOfToday.getTime();
     daysLeft = Math.max(0, Math.ceil(diffMs / (1000 * 60 * 60 * 24)));
   }
 
@@ -215,7 +249,7 @@ function App() {
 
     const totalProblems = activeProject.totalProblems;
     const examDate = activeProject.examDate;
-    const examTime = new Date(examDate).setHours(0, 0, 0, 0);
+    const examTime = parseYyyyMmDdLocal(examDate).getTime();
 
     const sessionsInRange = activeSessions.filter(
       (s) => s.date >= realTodayStr && s.date <= todayStr
@@ -224,8 +258,12 @@ function App() {
     sessionsInRange.forEach((s) => sessionByDate.set(s.date, s.amount));
 
     const dates: string[] = [];
-    for (let d = new Date(realTodayStr); d <= new Date(todayStr); d.setDate(d.getDate() + 1)) {
-      dates.push(d.toISOString().slice(0, 10));
+    const [ry, rm, rd] = realTodayStr.split("-").map(Number);
+    const [ty, tm, td] = todayStr.split("-").map(Number);
+    const rangeStart = new Date(ry, rm - 1, rd);
+    const rangeEnd = new Date(ty, tm - 1, td);
+    for (let d = new Date(rangeStart); d <= rangeEnd; d.setDate(d.getDate() + 1)) {
+      dates.push(formatLocalYyyyMmDd(d));
     }
 
     let carryIn = 0;
@@ -238,7 +276,7 @@ function App() {
         .filter((s) => s.date < dateStr)
         .reduce((sum, s) => sum + s.amount, 0);
       const remaining = Math.max(0, totalProblems - totalDoneBefore);
-      const dateTime = new Date(dateStr).setHours(0, 0, 0, 0);
+      const dateTime = parseYyyyMmDdLocal(dateStr).getTime();
       const daysLeftAt = Math.max(
         0,
         Math.ceil((examTime - dateTime) / (1000 * 60 * 60 * 24))
@@ -262,7 +300,7 @@ function App() {
 
     if (requiredNewToday === null) {
       const remaining = totalProblems;
-      const dateTime = new Date(todayStr).setHours(0, 0, 0, 0);
+      const dateTime = parseYyyyMmDdLocal(todayStr).getTime();
       const daysLeftAt = Math.max(
         0,
         Math.ceil((examTime - dateTime) / (1000 * 60 * 60 * 24))
@@ -372,11 +410,8 @@ function App() {
   const REVIEW_INTERVALS = [1, 7, 30] as const;
 
   const reviewTasks: ReviewTask[] = useMemo(() => {
-    const addDays = (dateStr: string, days: number): string => {
-      const d = new Date(dateStr);
-      d.setDate(d.getDate() + days);
-      return d.toISOString().slice(0, 10);
-    };
+    const addDays = (dateStr: string, days: number): string =>
+      addDaysToYyyyMmDd(dateStr, days);
 
     const seen = new Set<string>(); // (date, interval) で1日1タスクに
     const tasks: ReviewTask[] = [];
@@ -441,17 +476,15 @@ function App() {
     if (!activeProject) return [];
 
     const totalProblems = activeProject.totalProblems;
-    const examTime = new Date(activeProject.examDate).setHours(0, 0, 0, 0);
+    const examTime = parseYyyyMmDdLocal(activeProject.examDate).getTime();
     const sessionByDate = new Map<string, number>();
     activeSessions.forEach((s) => sessionByDate.set(s.date, s.amount));
 
     const dates: string[] = [];
-    const start = new Date(realTodayStr);
-    start.setDate(start.getDate() - 6);
+    const [cy, cm, cd] = realTodayStr.split("-").map(Number);
     for (let i = 0; i < 7; i++) {
-      const d = new Date(start);
-      d.setDate(d.getDate() + i);
-      dates.push(d.toISOString().slice(0, 10));
+      const d = new Date(cy, cm - 1, cd - 6 + i);
+      dates.push(formatLocalYyyyMmDd(d));
     }
 
     let carryIn = 0;
@@ -462,7 +495,7 @@ function App() {
         .filter((s) => s.date < dateStr)
         .reduce((sum, s) => sum + s.amount, 0);
       const remaining = Math.max(0, totalProblems - totalDoneBefore);
-      const dateTime = new Date(dateStr).setHours(0, 0, 0, 0);
+      const dateTime = parseYyyyMmDdLocal(dateStr).getTime();
       const daysLeftAt = Math.max(
         0,
         Math.ceil((examTime - dateTime) / (1000 * 60 * 60 * 24))
@@ -575,7 +608,7 @@ function App() {
                     value={newProjectExamDate}
                     onChange={(e) => setNewProjectExamDate(e.target.value)}
                     min={realTodayStr}
-                    className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm"
+                    className={dateInputClass}
                     required
                   />
                 </div>
@@ -660,7 +693,7 @@ function App() {
                   </label>
                   <input
                     type="date"
-                    className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-sky-400 focus:ring-2 focus:ring-sky-200 outline-none bg-white"
+                    className={dateInputClass}
                     value={examDateInput}
                     onChange={(e) => setExamDateInput(e.target.value)}
                     min={realTodayStr}
