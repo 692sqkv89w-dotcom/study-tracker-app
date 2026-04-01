@@ -40,8 +40,9 @@ function parseYyyyMmDdLocal(s: string): Date {
   return new Date(y, m - 1, d);
 }
 
-const dateInputClass =
-  "w-full min-w-0 min-h-[2.75rem] box-border rounded-xl border border-slate-200 px-3 py-2 text-base text-slate-900 shadow-sm focus:border-sky-400 focus:ring-2 focus:ring-sky-200 outline-none bg-white [color-scheme:light]";
+/** 試験設定・プロジェクト追加フォームの text / date / number を同一高さに（モバイルの date ずれ対策は index.css の .app-form-input） */
+const formFieldClass =
+  "app-form-input block w-full max-w-full min-w-0 h-11 box-border rounded-xl border border-slate-200 px-3 py-0 text-base leading-normal text-slate-900 shadow-sm focus:border-sky-400 focus:ring-2 focus:ring-sky-200 outline-none bg-white [color-scheme:light]";
 
 function usePersistentState<T>(
   key: string,
@@ -633,37 +634,37 @@ function App() {
               className="mt-4 pt-4 border-t border-slate-100 space-y-3"
             >
               <h3 className="text-sm font-medium text-slate-700">新しいプロジェクト</h3>
-              <div className="grid gap-3 sm:grid-cols-[1fr,1fr,auto] sm:items-end">
-                <div>
+              <div className="grid gap-3 sm:grid-cols-[1fr,1fr,auto] sm:items-end min-w-0 max-w-full">
+                <div className="min-w-0 max-w-full">
                   <label className="block text-xs font-medium text-slate-500 mb-1">名前（例：期末テスト）</label>
                   <input
                     type="text"
                     value={newProjectName}
                     onChange={(e) => setNewProjectName(e.target.value)}
-                    className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm"
+                    className={formFieldClass}
                     placeholder="プロジェクト名"
                     required
                   />
                 </div>
-                <div>
+                <div className="min-w-0 max-w-full overflow-hidden">
                   <label className="block text-xs font-medium text-slate-500 mb-1">試験日</label>
                   <input
                     type="date"
                     value={newProjectExamDate}
                     onChange={(e) => setNewProjectExamDate(e.target.value)}
                     min={realTodayStr}
-                    className={dateInputClass}
+                    className={formFieldClass}
                     required
                   />
                 </div>
-                <div>
+                <div className="min-w-0 max-w-full">
                   <label className="block text-xs font-medium text-slate-500 mb-1">総問題数</label>
                   <input
                     type="number"
                     value={newProjectTotal}
                     onChange={(e) => setNewProjectTotal(e.target.value)}
                     min={1}
-                    className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm"
+                    className={formFieldClass}
                     required
                   />
                 </div>
@@ -717,40 +718,40 @@ function App() {
                   上の「+」でプロジェクトを追加してください。
                 </p>
               ) : (
-              <form onSubmit={handleSaveSettings} className="space-y-4">
-                <div className="space-y-1">
+              <form onSubmit={handleSaveSettings} className="space-y-4 min-w-0 max-w-full">
+                <div className="space-y-1 min-w-0 max-w-full">
                   <label className="block text-sm font-medium text-slate-700">
                     プロジェクト名
                   </label>
                   <input
                     type="text"
-                    className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-sky-400 focus:ring-2 focus:ring-sky-200 outline-none bg-white"
+                    className={formFieldClass}
                     value={projectNameInput}
                     onChange={(e) => setProjectNameInput(e.target.value)}
                     placeholder="例：簿記2級"
                     required
                   />
                 </div>
-                <div className="space-y-1">
+                <div className="space-y-1 min-w-0 max-w-full overflow-hidden">
                   <label className="block text-sm font-medium text-slate-700">
                     試験日
                   </label>
                   <input
                     type="date"
-                    className={dateInputClass}
+                    className={formFieldClass}
                     value={examDateInput}
                     onChange={(e) => setExamDateInput(e.target.value)}
                     min={realTodayStr}
                     required
                   />
                 </div>
-                <div className="space-y-1">
+                <div className="space-y-1 min-w-0 max-w-full">
                   <label className="block text-sm font-medium text-slate-700">
                     総問題数
                   </label>
                   <input
                     type="number"
-                    className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-sky-400 focus:ring-2 focus:ring-sky-200 outline-none bg-white"
+                    className={formFieldClass}
                     value={totalProblemsInput}
                     onChange={(e) => setTotalProblemsInput(e.target.value)}
                     min={1}
