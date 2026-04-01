@@ -110,14 +110,15 @@ function App() {
       {}
     );
 
+  /** 「今日の入力」が紐づくカレンダー日（日付跨ぎでリセット判定に使う） */
+  const [inputCalendarDate, setInputCalendarDate] = usePersistentState<
+    string | null
+  >("study-app:inputCalendarDate", null);
+  const inputCalendarDateRef = useRef<string | null>(inputCalendarDate);
+  inputCalendarDateRef.current = inputCalendarDate;
+
   const [showSettingsPanel, setShowSettingsPanel] = useState(false);
   const [activeTab, setActiveTab] = useState<0 | 1 | 2>(0);
-  /** 日付が変わったあとも「今日」を更新する（開きっぱなし対策） */
-  const [, setClockTick] = useState(0);
-  useEffect(() => {
-    const id = window.setInterval(() => setClockTick((n) => n + 1), 60_000);
-    return () => clearInterval(id);
-  }, []);
   const [showAddProject, setShowAddProject] = useState(false);
   const [newProjectName, setNewProjectName] = useState("");
   const [newProjectExamDate, setNewProjectExamDate] = useState("");
@@ -170,6 +171,49 @@ function App() {
     },
     [activeProjectId, checkedReviewIds, setCheckedReviewIdsByProject]
   );
+
+  const resetTransientDayInputs = useCallback(() => {
+    setDoneNewTodayByProject({});
+    setStudyContentByProject({});
+    setCheckedReviewIdsByProject({});
+  }, [setDoneNewTodayByProject, setStudyContentByProject, setCheckedReviewIdsByProject]);
+
+  useEffect(() => {
+    const today = formatLocalYyyyMmDd(new Date());
+    if (inputCalendarDate === null) {
+      setInputCalendarDate(today);
+      resetTransientDayInputs();
+      return;
+    }
+    if (inputCalendarDate !== today) {
+      resetTransientDayInputs();
+      setInputCalendarDate(today);
+    }
+  }, [
+    inputCalendarDate,
+    setInputCalendarDate,
+    resetTransientDayInputs,
+  ]);
+
+  useEffect(() => {
+    const syncIfNewCalendarDay = () => {
+      const today = formatLocalYyyyMmDd(new Date());
+      const prev = inputCalendarDateRef.current;
+      if (prev !== null && prev !== today) {
+        resetTransientDayInputs();
+        setInputCalendarDate(today);
+      }
+    };
+    const onVisibility = () => {
+      if (document.visibilityState === "visible") syncIfNewCalendarDay();
+    };
+    window.addEventListener("focus", syncIfNewCalendarDay);
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => {
+      window.removeEventListener("focus", syncIfNewCalendarDay);
+      document.removeEventListener("visibilitychange", onVisibility);
+    };
+  }, [resetTransientDayInputs, setInputCalendarDate]);
 
   useEffect(() => {
     if (activeProject) {
