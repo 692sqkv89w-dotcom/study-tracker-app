@@ -40,6 +40,42 @@ function parseYyyyMmDdLocal(s: string): Date {
   return new Date(y, m - 1, d);
 }
 
+/** カレンダー日付が変わる直前に、各プロジェクトのドラフトをその日の studySessions へ確定 */
+function commitDraftToStudySessionsForDay(
+  setStudySessions: (
+    next: StudySession[] | ((prev: StudySession[]) => StudySession[])
+  ) => void,
+  calendarDate: string,
+  projectIds: string[],
+  draftDone: Record<string, string>,
+  draftContent: Record<string, string>
+) {
+  setStudySessions((prev) => {
+    const next = prev.filter(
+      (s) =>
+        !(
+          projectIds.includes(s.projectId) && s.date === calendarDate
+        )
+    );
+    for (const pid of projectIds) {
+      const raw = draftDone[pid] ?? "0";
+      const n = Number(raw);
+      const amt = Number.isNaN(n) || n < 0 ? 0 : n;
+      const content = (draftContent[pid] ?? "").trim();
+      if (amt > 0 || content) {
+        next.push({
+          id: `session-${calendarDate}-${pid}`,
+          projectId: pid,
+          date: calendarDate,
+          amount: amt,
+          content: content || undefined,
+        });
+      }
+    }
+    return next;
+  });
+}
+
 /** 試験設定・プロジェクト追加フォームの text / date / number を同一高さに（モバイルの date ずれ対策は index.css の .app-form-input） */
 const formFieldClass =
   "app-form-input block w-full max-w-full min-w-0 h-11 box-border rounded-xl border border-slate-200 px-3 py-0 text-base leading-normal text-slate-900 shadow-sm focus:border-sky-400 focus:ring-2 focus:ring-sky-200 outline-none bg-white [color-scheme:light]";
@@ -117,6 +153,12 @@ function App() {
   >("study-app:inputCalendarDate", null);
   const inputCalendarDateRef = useRef<string | null>(inputCalendarDate);
   inputCalendarDateRef.current = inputCalendarDate;
+  const draftDoneRef = useRef(doneNewTodayByProject);
+  draftDoneRef.current = doneNewTodayByProject;
+  const draftContentRef = useRef(studyContentByProject);
+  draftContentRef.current = studyContentByProject;
+  const projectsRef = useRef(projects);
+  projectsRef.current = projects;
 
   const [showSettingsPanel, setShowSettingsPanel] = useState(false);
   const [activeTab, setActiveTab] = useState<0 | 1 | 2>(0);
@@ -186,14 +228,25 @@ function App() {
       resetTransientDayInputs();
       return;
     }
-    if (inputCalendarDate !== today) {
-      resetTransientDayInputs();
-      setInputCalendarDate(today);
+    if (inputCalendarDate === today) {
+      return;
     }
+    const oldDate = inputCalendarDate;
+    const ids = projectsRef.current.map((p) => p.id);
+    commitDraftToStudySessionsForDay(
+      setStudySessions,
+      oldDate,
+      ids,
+      draftDoneRef.current,
+      draftContentRef.current
+    );
+    resetTransientDayInputs();
+    setInputCalendarDate(today);
   }, [
     inputCalendarDate,
     setInputCalendarDate,
     resetTransientDayInputs,
+    setStudySessions,
   ]);
 
   useEffect(() => {
@@ -201,6 +254,14 @@ function App() {
       const today = formatLocalYyyyMmDd(new Date());
       const prev = inputCalendarDateRef.current;
       if (prev !== null && prev !== today) {
+        const ids = projectsRef.current.map((p) => p.id);
+        commitDraftToStudySessionsForDay(
+          setStudySessions,
+          prev,
+          ids,
+          draftDoneRef.current,
+          draftContentRef.current
+        );
         resetTransientDayInputs();
         setInputCalendarDate(today);
       }
@@ -214,7 +275,7 @@ function App() {
       window.removeEventListener("focus", syncIfNewCalendarDay);
       document.removeEventListener("visibilitychange", onVisibility);
     };
-  }, [resetTransientDayInputs, setInputCalendarDate]);
+  }, [resetTransientDayInputs, setInputCalendarDate, setStudySessions]);
 
   useEffect(() => {
     if (activeProject) {
@@ -288,7 +349,7 @@ function App() {
   })();
 
   // 繰り越し込みの「今日の必要ノルマ」を計算（表示中の日 = todayStr。明日で表示時は実今日の未達が追加分になる）
-  // 実今日の実績は入力欄の値を使う（studySessions は useEffect で遅れて更新されるため）
+  // 実今日の実績はドラフト入力。studySessions の「今日」は日付が変わるコミットまで書かない（当日は session を参照しない）
   const { requiredNewToday, carryOverToday, showCarryOverLabel } = useMemo(() => {
     if (!activeProject) return { requiredNewToday: null as number | null, carryOverToday: 0, showCarryOverLabel: false };
 
@@ -300,7 +361,10 @@ function App() {
       (s) => s.date >= realTodayStr && s.date <= todayStr
     );
     const sessionByDate = new Map<string, number>();
-    sessionsInRange.forEach((s) => sessionByDate.set(s.date, s.amount));
+    sessionsInRange.forEach((s) => {
+      if (s.date === realTodayStr) return;
+      sessionByDate.set(s.date, s.amount);
+    });
 
     const dates: string[] = [];
     const [ry, rm, rd] = realTodayStr.split("-").map(Number);
@@ -430,28 +494,6 @@ function App() {
 
   const parsedDoneNewToday = parsedDoneNewTodayForCarry;
 
-  // 今日の新規実績＋勉強内容から StudySession を更新（忘却曲線用の「種」）※常に実日付で保存
-  useEffect(() => {
-    if (!activeProjectId) return;
-    const sessionId = `session-${realTodayStr}-${activeProjectId}`;
-    setStudySessions((prev) => {
-      const others = prev.filter(
-        (s) => !(s.projectId === activeProjectId && s.date === realTodayStr)
-      );
-      if (parsedDoneNewToday <= 0 && !studyContentInput.trim()) {
-        return others;
-      }
-      const nextSession: StudySession = {
-        id: sessionId,
-        projectId: activeProjectId,
-        date: realTodayStr,
-        amount: parsedDoneNewToday,
-        content: studyContentInput.trim() || undefined,
-      };
-      return [...others, nextSession];
-    });
-  }, [activeProjectId, parsedDoneNewToday, studyContentInput, setStudySessions, realTodayStr]);
-
   const REVIEW_INTERVALS = [1, 7, 30] as const;
 
   const reviewTasks: ReviewTask[] = useMemo(() => {
@@ -510,7 +552,12 @@ function App() {
   // 今日の合計進捗 0〜100%（新規と復習の平均）
   const totalProgress = (newScore + reviewScore) / 2;
 
-  const totalDoneProblems = activeSessions.reduce((sum, s) => sum + s.amount, 0);
+  const totalDoneProblems = useMemo(() => {
+    const committedExcludingToday = activeSessions
+      .filter((s) => s.date !== realTodayStr)
+      .reduce((sum, s) => sum + s.amount, 0);
+    return committedExcludingToday + parsedDoneNewTodayForCarry;
+  }, [activeSessions, realTodayStr, parsedDoneNewTodayForCarry]);
   const remainingProblems =
     activeProject != null
       ? Math.max(0, activeProject.totalProblems - totalDoneProblems)
@@ -523,7 +570,10 @@ function App() {
     const totalProblems = activeProject.totalProblems;
     const examTime = parseYyyyMmDdLocal(activeProject.examDate).getTime();
     const sessionByDate = new Map<string, number>();
-    activeSessions.forEach((s) => sessionByDate.set(s.date, s.amount));
+    activeSessions.forEach((s) => {
+      if (s.date === realTodayStr) return;
+      sessionByDate.set(s.date, s.amount);
+    });
 
     const dates: string[] = [];
     const [cy, cm, cd] = realTodayStr.split("-").map(Number);
